@@ -11,11 +11,8 @@ fn main() {
         for character in buffer.chars() {
             if character == ' ' {result.push('_')} else {result.push(character)}
         }
-
-        println!("{}", result);
-        result.clear();
+        print!("{}", result);
         buffer.clear();
+        result.clear();
     }
-
-
 }
