@@ -14,12 +14,29 @@ fn main() {
     let mut buffer = String::new();
     let mut result = String::new();
     let mut operation_mode = TrMode::Replace; //default
+    let mut complement_set = false;
+    let mut truncate_set = false;
 
-    let args: Vec<_> = env::args().collect();
-    if args.len() > 2 {
+    if env::args().count() > 2 {
+        let mut first_non_option_arg_number = 0;
+        for (arg, arg_number) in env::args().enumerate() {
+            match arg {
+                "-c" => complement_set = true,
+                "-C" => complement_set = true,
+                "--complement" => complement_set = true,
+                "-d" => operation_mode = TrMode::Delete,
+                "--delete" => operation_mode = TrMode::Delete,
+                "-s" => operation_mode = TrMode::SqueezeRepeats,
+                "--squeeze-repeats" => operation_mode = TrMode::SqueezeRepeats,
+                "-t" => truncate_set = true,
+                "--truncate-set1" => truncate_set = true,
+                _ => if first_non_option_arg_number == 0 {}, //first_non_option_arg_number = arg_number
+            }
+        }
+        println!("arg_number: {}", first_non_option_arg_number);
         //TODO: leave them as strings and check if char is in string
-        let char_to_replace = args[1].chars().nth(0).unwrap();
-        let char_to_insert = args[2].chars().nth(0).unwrap();
+        let char_to_replace = ' '; // args[1].chars().nth(0).unwrap();
+        let char_to_insert = '_'; //args[2].chars().nth(0).unwrap();
         // main loop
         while stdin.read_line(&mut buffer).unwrap() > 0 {
             for character in buffer.chars() {
