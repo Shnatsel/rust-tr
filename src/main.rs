@@ -16,26 +16,26 @@ fn main() {
     let mut operation_mode = TrMode::Replace; //default
     let mut complement_set = false;
     let mut truncate_set = false;
+    let mut first_argument_requires_escaping_dash = true; //for GNU-compatible option parsing
 
     if env::args().count() > 2 {
-        let mut first_non_option_arg_number = 0;
-        for (arg, arg_number) in env::args().enumerate() {
-            match arg {
-                "-c" => complement_set = true,
-                "-C" => complement_set = true,
-                "--complement" => complement_set = true,
-                "-d" => operation_mode = TrMode::Delete,
-                "--delete" => operation_mode = TrMode::Delete,
-                "-s" => operation_mode = TrMode::SqueezeRepeats,
-                "--squeeze-repeats" => operation_mode = TrMode::SqueezeRepeats,
-                "-t" => truncate_set = true,
-                "--truncate-set1" => truncate_set = true,
-                _ => if first_non_option_arg_number == 0 {}, //first_non_option_arg_number = arg_number
+        let mut first_non_option_argument = 0;
+        for (arg_number, arg) in env::args().skip(1).enumerate() {
+            match arg.to_string().as_str() {
+                "-c" | "-C" | "--complement" => complement_set = true,
+                "-d" | "--delete" => operation_mode = TrMode::Delete,
+                "-s" | "--squeeze-repeats" => operation_mode = TrMode::SqueezeRepeats,
+                "-t" | "--truncate-set1" => truncate_set = true,
+                "--" => {first_argument_requires_escaping_dash = false;
+                         first_non_option_argument = arg_number + 1; break},
+                _ => if arg.to_string().chars().nth(0).unwrap() == '-' {panic!("Unknown argument: {}", arg)}
+                     else {first_non_option_argument = arg_number; break},
             }
         }
-        println!("arg_number: {}", first_non_option_arg_number);
         //TODO: leave them as strings and check if char is in string
-        let char_to_replace = ' '; // args[1].chars().nth(0).unwrap();
+        println!("First non-option argument: {}", first_non_option_argument);
+        let chars_to_replace = env::args().skip(1).nth(first_non_option_argument).unwrap();
+        let char_to_replace = chars_to_replace.chars().nth(0).unwrap(); //temp hack
         let char_to_insert = '_'; //args[2].chars().nth(0).unwrap();
         // main loop
         while stdin.read_line(&mut buffer).unwrap() > 0 {
