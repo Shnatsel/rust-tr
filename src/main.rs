@@ -3,8 +3,8 @@ use std::env;
 use std::io::prelude::*;
 
 enum TrMode {
-    Replace(Vec<char>, Vec<char>),
-    Delete(Vec<char>),
+    Replace(Vec<char>),
+    Delete,
 }
 
 fn main() {
@@ -12,7 +12,7 @@ fn main() {
     let mut stdin = stdin.lock();
     let mut buffer = String::new();
     let mut result = String::new();
-    let mut operation_mode = TrMode::Replace(Vec::new(), Vec::new()); //default mode
+    let mut operation_mode = TrMode::Replace(Vec::new()); //default mode
     let mut squeeze_repeats = false;
     let mut chars_to_squeeze: Vec<char> = Vec::new();
     let mut complement_set = false;
@@ -24,7 +24,7 @@ fn main() {
         for (arg_number, arg) in env::args().skip(1).enumerate() {
             match arg.to_string().as_str() {
                 "-c" | "-C" | "--complement" => complement_set = true,
-                "-d" | "--delete" => operation_mode = TrMode::Delete(Vec::new()),
+                "-d" | "--delete" => operation_mode = TrMode::Delete,
                 "-s" | "--squeeze-repeats" => squeeze_repeats = true,
                 "-t" | "--truncate-set1" => truncate_set = true,
                 "--" => {first_argument_requires_escaping_dash = false;
@@ -34,24 +34,22 @@ fn main() {
             }
         }
         match operation_mode {
-            TrMode::Replace(_,_) => operation_mode = TrMode::Replace(
-                                    env::args().skip(1).nth(first_non_option_argument).unwrap().chars().collect(),
-                                    env::args().skip(1).nth(first_non_option_argument + 1).unwrap().chars().collect()),
-            TrMode::Delete(_) => operation_mode = TrMode::Delete(env::args().skip(1).nth(first_non_option_argument).unwrap().chars().collect()),
+            TrMode::Replace(_) => operation_mode = TrMode::Replace(env::args().skip(1).nth(first_non_option_argument + 1).unwrap().chars().collect()),
+            _ => {},
         }
         //FIXME: temp hack
-        let chars_to_replace = env::args().skip(1).nth(first_non_option_argument).unwrap();
-        let char_to_replace = chars_to_replace.chars().nth(0).unwrap(); //temp hack
+        let chars_to_replace: Vec<char> = env::args().skip(1).nth(first_non_option_argument).unwrap().chars().collect();
+        let char_to_replace = chars_to_replace[0]; //temp hack
         let chars_to_insert = env::args().skip(1).nth(first_non_option_argument + 1).unwrap();
         let char_to_insert = chars_to_insert.chars().nth(0).unwrap(); //temp hack
         // main loop
         while stdin.read_line(&mut buffer).unwrap() > 0 {
             for character in buffer.chars() {
                 //TODO: replace == with custom function to handle --complement and multiple chars
-                if character == char_to_replace {
+                if chars_to_replace.contains(&character) {
                     match operation_mode {
-                        TrMode::Replace(_,_) => result.push(char_to_insert),
-                        TrMode::Delete(_) => {}, //do not copy char to output buffer
+                        TrMode::Replace(_) => result.push(char_to_insert),
+                        TrMode::Delete => {}, //do not copy char to output buffer
                     }
                 } else {result.push(character)};
             }
