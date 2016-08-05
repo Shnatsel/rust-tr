@@ -34,10 +34,14 @@ fn main() {
                      else {first_non_option_argument = arg_number; break},
             }
         }
-        let chars_to_replace: Vec<char> = env::args().skip(1).nth(first_non_option_argument).unwrap().chars().collect();
+        let mut chars_to_replace: Vec<char> = env::args().skip(1).nth(first_non_option_argument).unwrap().chars().collect();
         match operation_mode {
             // if we're replacing, read the chars to replace with from command line
-            TrMode::ReplaceWith(_) => operation_mode = TrMode::ReplaceWith(env::args().skip(1).nth(first_non_option_argument + 1).unwrap().chars().collect()),
+            TrMode::ReplaceWith(_) => {
+                let chars_to_insert: Vec<char> = env::args().skip(1).nth(first_non_option_argument + 1).unwrap().chars().collect();
+                if truncate_set {chars_to_replace.truncate(chars_to_insert.len())};
+                operation_mode = TrMode::ReplaceWith(chars_to_insert);
+            },
             _ => {},
         };
 
