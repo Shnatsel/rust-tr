@@ -5,6 +5,62 @@ use std::io::prelude::*;
 enum TrMode {
     ReplaceWith(Vec<char>),
     Delete,
+    //TODO: case conversion
+}
+
+fn escaped_sequences_to_chars(input_string: String) -> String {
+    let mut previous_character = Option::None;
+    let mut escaped_octal_digits: Vec<char> = Vec::with_capacity(3);
+    let mut output_string = String::new();
+    for character in input_string.chars() {
+        if escaped_octal_digits.len() == 0 {
+            if character == '\\' {
+                // special character; do nothing and handle special char next round
+            } else if previous_character.is_some() && previous_character.unwrap() == '\\' {
+                match character {
+                    '\\' => output_string.push('\\'),
+                    'n' => output_string.push('\n'),
+                    'r' => output_string.push('\r'),
+                    't' => output_string.push('\t'),
+                    'a' => output_string.push('\x07'),
+                    'b' => output_string.push('\x08'),
+                    'f' => output_string.push('\x0C'),
+                    'v' => output_string.push('\x0B'),
+                    digit @ '0' ... '3' => escaped_octal_digits.push(digit),
+                    // Octal values of 400 and higher trigger a warning from GNU tr.
+                    // It interprets them as two-byte sequence.
+                    // We simply error out to avoid dubious feature bloat.
+                    '4' ... '9' => panic!("Character codes higher than \\399 are not valid ASCII characters"),
+                    _ => panic!("Unknown escape sequence \\{}", character),
+                }
+            } else if previous_character.is_some() && character == '-' {
+                // TODO: insert range from previous_character to character
+            } else {
+                output_string.push(character);
+            };
+        } else {
+            let is_octal_digit = match character {'0' ... '7' => true, _ => false};
+            // handle the character we got
+            if is_octal_digit {escaped_octal_digits.push(character)}
+            else if character == '\\' {} // do nothing, will be handled next round
+            else {output_string.push(character)};
+            // check if we should stop parsing incoming chars as escaped octal digits
+            if !is_octal_digit || escaped_octal_digits.len() == 3 {
+                //TODO: split this block into a function to avoid copypasting this below
+                let mut final_char_code = 0u32;
+                escaped_octal_digits.reverse(); // for use in the loop below
+                for (order, digit_char) in escaped_octal_digits.iter().enumerate() {
+                    let octal_digit = digit_char.to_digit(8).unwrap();
+                    final_char_code += octal_digit * 8u32.pow(order as u32);
+                }
+                output_string.push(std::char::from_u32(final_char_code).unwrap());
+                escaped_octal_digits.clear();
+            }
+        };
+        previous_character = Option::Some(character);
+    };
+    //TODO: wrap up parsing after the loop: trailing \, unclosed octals
+    return output_string;
 }
 
 fn main() {
@@ -101,7 +157,7 @@ fn main() {
             }
             // output is line-buffered, but we do not always print \n,
             // so without the following line we may never output anything
-            io::stdout().flush();
+            io::stdout().flush().unwrap();
             buffer.clear();
             result.clear();
             squeezed_result.clear();
