@@ -2,64 +2,114 @@ use std::io;
 use std::env;
 use std::io::prelude::*;
 
+#[derive(Debug)]
 enum TrMode {
     ReplaceWith(Vec<char>),
     Delete,
     //TODO: case conversion
 }
 
+#[derive(Debug)]
+enum EscapeParserMode {
+    Normal,
+    EscapedOctalDigits,
+    CharacterRange,
+}
+
 fn escaped_sequences_to_chars(input_string: String) -> String {
-    let mut previous_character = Option::None;
+    let mut parser_mode = EscapeParserMode::Normal;
+    let mut previous_character: std::option::Option<char> = Option::None;
+    let mut lower_character_for_range: std::option::Option<char> = Option::None;
     let mut escaped_octal_digits: Vec<char> = Vec::with_capacity(3);
     let mut output_string = String::new();
     for character in input_string.chars() {
-        if escaped_octal_digits.len() == 0 {
-            if character == '\\' {
-                // special character; do nothing and handle special char next round
-            } else if previous_character.is_some() && previous_character.unwrap() == '\\' {
-                match character {
-                    '\\' => output_string.push('\\'),
-                    'n' => output_string.push('\n'),
-                    'r' => output_string.push('\r'),
-                    't' => output_string.push('\t'),
-                    'a' => output_string.push('\x07'),
-                    'b' => output_string.push('\x08'),
-                    'f' => output_string.push('\x0C'),
-                    'v' => output_string.push('\x0B'),
-                    digit @ '0' ... '3' => escaped_octal_digits.push(digit),
+        match parser_mode {
+            EscapeParserMode::Normal => {
+                if character == '\\' {
+                    // escapes special character; do nothing and handle the special char next round
+                } else if previous_character.is_some() && previous_character.unwrap() == '\\' {
+                    match character {
+                        '\\' => output_string.push('\\'),
+                        'n' => output_string.push('\n'),
+                        'r' => output_string.push('\r'),
+                        't' => output_string.push('\t'),
+                        'a' => output_string.push('\x07'),
+                        'b' => output_string.push('\x08'),
+                        'f' => output_string.push('\x0C'),
+                        'v' => output_string.push('\x0B'),
+                        digit @ '0' ... '7' => {escaped_octal_digits.push(digit);
+                                                parser_mode = EscapeParserMode::EscapedOctalDigits},
+                        _ => panic!("Unknown escape sequence \\{}", character),
+                    }
+                } else if previous_character.is_some() && character == '-' {
+                    lower_character_for_range = previous_character;
+                    parser_mode = EscapeParserMode::CharacterRange;
+                    // on the next iteration we will get the upper bound,
+                    // calculate the range and push the chars to output string
+                } else {
+                    output_string.push(character);
+                };
+            },
+            EscapeParserMode::CharacterRange => {
+                let lower_bound = lower_character_for_range.unwrap() as u32 + 1;
+                let upper_bound = character as u32 + 1;
+                if lower_bound < upper_bound {
+                    for char_code in lower_bound .. upper_bound {
+                        output_string.push(std::char::from_u32(char_code).unwrap());
+                    }
+                } else if lower_bound == upper_bound {
+                    // we've been given a range like "a-a".
+                    // in this case GNU tr simply prints "a"
+                    // normal-mode loop has already pushed "a" to output string,
+                    // so we don't have to do anything here.
+                } else {
+                    panic!("tr: range-endpoints of '{}-{}' are in reverse collating sequence order",
+                           lower_character_for_range.unwrap(), character);
+                }
+                lower_character_for_range = Option::None;
+                parser_mode = EscapeParserMode::Normal;
+            },
+            EscapeParserMode::EscapedOctalDigits => {
+                let is_octal_digit = match character {'0' ... '7' => true, _ => false};
+                // process the character we got
+                if is_octal_digit {escaped_octal_digits.push(character)};
+                // check if we should stop parsing incoming chars as escaped octal digits
+                if !is_octal_digit || escaped_octal_digits.len() == 3 {
                     // Octal values of 400 and higher trigger a warning from GNU tr.
                     // It interprets them as two-byte sequence.
                     // We simply error out to avoid dubious feature bloat.
-                    '4' ... '9' => panic!("Character codes higher than \\399 are not valid ASCII characters"),
-                    _ => panic!("Unknown escape sequence \\{}", character),
+                    match escaped_octal_digits[0] {
+                        '4' ... '9' => panic!("Character codes higher than \\399 are not valid ASCII characters"),
+                        _ => {},
+                    };
+                    //TODO: split this block into a function to avoid copypasting this below
+                    let mut final_char_code = 0u32;
+                    escaped_octal_digits.reverse(); // for use in the loop below
+                    for (order, digit_char) in escaped_octal_digits.iter().enumerate() {
+                        let octal_digit = digit_char.to_digit(8).unwrap();
+                        final_char_code += octal_digit * 8u32.pow(order as u32);
+                    }
+                    output_string.push(std::char::from_u32(final_char_code).unwrap());
+                    escaped_octal_digits.clear();
+                    parser_mode = EscapeParserMode::Normal;
                 }
-            } else if previous_character.is_some() && character == '-' {
-                // TODO: insert range from previous_character to character
-            } else {
-                output_string.push(character);
-            };
-        } else {
-            let is_octal_digit = match character {'0' ... '7' => true, _ => false};
-            // handle the character we got
-            if is_octal_digit {escaped_octal_digits.push(character)}
-            else if character == '\\' {} // do nothing, will be handled next round
-            else {output_string.push(character)};
-            // check if we should stop parsing incoming chars as escaped octal digits
-            if !is_octal_digit || escaped_octal_digits.len() == 3 {
-                //TODO: split this block into a function to avoid copypasting this below
-                let mut final_char_code = 0u32;
-                escaped_octal_digits.reverse(); // for use in the loop below
-                for (order, digit_char) in escaped_octal_digits.iter().enumerate() {
-                    let octal_digit = digit_char.to_digit(8).unwrap();
-                    final_char_code += octal_digit * 8u32.pow(order as u32);
-                }
-                output_string.push(std::char::from_u32(final_char_code).unwrap());
-                escaped_octal_digits.clear();
-            }
+                // this block is here because if we encounter a regular character,
+                // it should be pushed AFTER we handle the escaped character
+                // example sequence: a\12b
+                if is_octal_digit {} // already handled above
+                else if character == '\\' {} // do nothing, will be handled next round
+                else {output_string.push(character)};
+            },
         };
         previous_character = Option::Some(character);
     };
-    //TODO: wrap up parsing after the loop: trailing \, unclosed octals
+    // wrap up parsing after the loop
+    //println!("Parser mode at the end: {:?}", parser_mode);
+    match parser_mode {
+        // wrap up unclosed ranges
+        EscapeParserMode::CharacterRange => output_string.push('-'),
+        _ => {}, //TODO: wrap up parsing after the loop: trailing \, unclosed octals
+    };
     return output_string;
 }
 
@@ -75,6 +125,20 @@ fn main() {
     let mut complement_set = false;
     let mut truncate_set = false;
     let mut first_argument_requires_escaping_dash = true; //for GNU-compatible option parsing
+
+// parser regression testing
+    println!("ab-d translates to: \"{}\"", escaped_sequences_to_chars("ab-d".to_string()));
+    println!("a-def translates to: \"{}\"", escaped_sequences_to_chars("a-def".to_string()));
+    println!("a-a translates to: \"{}\"", escaped_sequences_to_chars("a-a".to_string()));
+    println!("a- translates to: \"{}\"", escaped_sequences_to_chars("a-".to_string())); //TODO
+//    println!("d-a translates to: \"{}\"", escaped_sequences_to_chars("d-a".to_string())); //panics
+    println!("a\\nb translates to: \"{}\"", escaped_sequences_to_chars("a\\nb".to_string()));
+    println!("a\\12b translates to: \"{}\"", escaped_sequences_to_chars("a\\12b".to_string()));
+    println!("a\\12 translates to: \"{}\"", escaped_sequences_to_chars("a\\12".to_string())); //TODO
+    println!("\\123 translates to: \"{}\"", escaped_sequences_to_chars("\\123".to_string()));
+//    println!("\\755 translates to: \"{}\"", escaped_sequences_to_chars("\\755".to_string())); //panics
+    println!("\\12-\\123 translates to: \"{}\"", escaped_sequences_to_chars("\\12-\\123".to_string())); //TODO
+
 
     // parsing of command-line arguments
     if env::args().count() > 2 {
