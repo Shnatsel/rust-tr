@@ -2,6 +2,7 @@ use std::io;
 use std::env;
 use std::io::prelude::*;
 
+#[derive(PartialEq)]
 #[derive(Debug)]
 enum TrMode {
     ReplaceWith(Vec<char>),
@@ -9,6 +10,7 @@ enum TrMode {
     //TODO: case conversion
 }
 
+#[derive(PartialEq)]
 #[derive(Debug)]
 enum EscapeParserMode {
     Normal,
@@ -126,6 +128,7 @@ fn main() {
     let mut truncate_set = false;
     let mut first_argument_requires_escaping_dash = true; //for GNU-compatible option parsing
 
+/*
 // parser regression testing
     println!("ab-d translates to: \"{}\"", escaped_sequences_to_chars("ab-d".to_string()));
     println!("a-def translates to: \"{}\"", escaped_sequences_to_chars("a-def".to_string()));
@@ -138,7 +141,7 @@ fn main() {
     println!("\\123 translates to: \"{}\"", escaped_sequences_to_chars("\\123".to_string()));
 //    println!("\\755 translates to: \"{}\"", escaped_sequences_to_chars("\\755".to_string())); //panics
     println!("\\12-\\123 translates to: \"{}\"", escaped_sequences_to_chars("\\12-\\123".to_string())); //TODO
-
+*/
 
     // parsing of command-line arguments
     if env::args().count() > 2 {
@@ -178,12 +181,14 @@ fn main() {
             },
         };
 
-        // If second argument is passed, use it for squeezing repeats.
-        // Otherwise operate in squeeze-only mode
+        // determine which characters to use for squeezing repeats
         let chars_to_squeeze: Vec<char> = if only_squeeze_repeats {
             escaped_sequences_to_chars(env::args().skip(1).nth(first_non_option_argument).unwrap()).chars().collect()
-        } else {
+        } else if squeeze_repeats {
+            // delete mode with squeezing repeats, use second argument
             escaped_sequences_to_chars(env::args().skip(1).nth(first_non_option_argument + 1).unwrap()).chars().collect()
+        } else {
+            Vec::new()
         };
 
         // main tr loop
