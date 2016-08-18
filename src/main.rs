@@ -108,9 +108,9 @@ fn escaped_sequences_to_chars(input_string: String) -> String {
     // wrap up parsing after the loop
     //println!("Parser mode at the end: {:?}", parser_mode);
     match parser_mode {
-        // wrap up unclosed ranges
-        EscapeParserMode::CharacterRange => output_string.push('-'),
-        _ => {}, //TODO: wrap up parsing after the loop: trailing \, unclosed octals
+        EscapeParserMode::CharacterRange => output_string.push('-'), // wrap up unclosed ranges
+        EscapeParserMode::Normal => if previous_character.unwrap_or(' ') == '\\' {output_string.push('\\')}, //wrap up parsing a trailing \
+        _ => {}, //TODO: wrap up parsing unclosed octals after the loop
     };
     return output_string;
 }
@@ -139,8 +139,10 @@ fn main() {
     println!("a\\12b translates to: \"{}\"", escaped_sequences_to_chars("a\\12b".to_string()));
     println!("a\\12 translates to: \"{}\"", escaped_sequences_to_chars("a\\12".to_string())); //TODO
     println!("\\123 translates to: \"{}\"", escaped_sequences_to_chars("\\123".to_string()));
+    println!("\\53 translates to: \"{}\"", escaped_sequences_to_chars("\\53".to_string()));
 //    println!("\\755 translates to: \"{}\"", escaped_sequences_to_chars("\\755".to_string())); //panics
     println!("\\12-\\123 translates to: \"{}\"", escaped_sequences_to_chars("\\12-\\123".to_string())); //TODO
+    println!("a\\ translates to: \"{}\"", escaped_sequences_to_chars("a\\".to_string()));
 */
 
     // parsing of command-line arguments
