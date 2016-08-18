@@ -102,9 +102,7 @@ pub fn parse(input_string: String) -> Vec<char> {
 
 fn octal_digits_to_char(octal_digits: &Vec<char>) -> char {
     let mut final_char_code = 0u32;
-    let mut octal_digits = octal_digits.to_owned();
-    octal_digits.reverse(); // for use in the loop below
-    for (order, digit_char) in octal_digits.iter().enumerate() {
+    for (order, digit_char) in octal_digits.iter().rev().enumerate() {
         let octal_digit = digit_char.to_digit(8).unwrap();
         final_char_code += octal_digit * 8u32.pow(order as u32);
     }
