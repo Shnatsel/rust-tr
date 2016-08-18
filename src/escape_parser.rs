@@ -61,17 +61,23 @@ pub fn parse(input_string: String) -> String {
             },
             EscapeParserMode::EscapedOctalDigits => {
                 let is_octal_digit = match character {'0' ... '7' => true, _ => false};
+                let first_digit_too_big_for_long_octal = if escaped_octal_digits.len() == 0 {
+                    false
+                } else {
+                    // Octal values of 400 and higher trigger a warning from GNU tr.
+                    // It interprets the first two digits as the character code,
+                    // and the last digit as a standalone digit.
+                    match escaped_octal_digits[0] {
+                        '0' ... '3' => false,
+                        '4' ... '9' => true,
+                        _ => panic!("Internal error: a non-digit was somehow put in octal digits buffer.\nPlease file a bug report."),
+                    }
+                };
                 // process the character we got
                 if is_octal_digit {escaped_octal_digits.push(character)};
                 // check if we should stop parsing incoming chars as escaped octal digits
-                if !is_octal_digit || escaped_octal_digits.len() == 3 {
-                    // Octal values of 400 and higher trigger a warning from GNU tr.
-                    // It interprets them as two-byte sequence.
-                    // We simply error out to avoid dubious feature bloat.
-                    match escaped_octal_digits[0] {
-                        '4' ... '9' => panic!("Character codes higher than \\399 are not valid ASCII characters"),
-                        _ => {},
-                    };
+                if !is_octal_digit || (first_digit_too_big_for_long_octal && escaped_octal_digits.len() == 2) || escaped_octal_digits.len() == 3 {
+
                     //TODO: split this block into a function to avoid copypasting this below
                     let mut final_char_code = 0u32;
                     escaped_octal_digits.reverse(); // for use in the loop below
@@ -106,6 +112,7 @@ pub fn parse(input_string: String) -> String {
 #[test]
 fn literal_input() {
     assert_eq!(parse("abcd".to_string()), "abcd".to_string());
+    assert_eq!(parse("абвг".to_string()), "абвг".to_string());
 }
 
 #[test]
@@ -129,8 +136,14 @@ fn escape_sequences() {
     assert_eq!(parse("a\\12b".to_string()), "a\nb".to_string());
     assert_eq!(parse("a\\123".to_string()), "aS".to_string());
     assert_eq!(parse("\\123".to_string()), "S".to_string());
-    println!("a\\12 translates to: \"{}\"", parse("a\\12".to_string())); //TODO
-    println!("\\53 translates to: \"{}\"", parse("\\53".to_string())); //TODO
+    assert_eq!(parse("a\\12".to_string()), "a\n".to_string());
+    println!("\\53 translates to: \"{}\"", parse("\\53".to_string()));
+}
+
+#[test]
+fn overflown_octals() {
+    // GNU tr detects potentially overflowing octals and cuts them off at 2 digits
+    assert_eq!(parse("\\525".to_string()), "*5".to_string());
 }
 
 #[test]
@@ -144,11 +157,4 @@ fn trailing_slashes() {
 #[ignore] //not implemented yet
 fn ranges_on_escape_sequences() {
     assert_eq!(parse("\\120-\\123".to_string()), "PQRS".to_string());
-}
-
-#[test]
-#[ignore] //not implemented yet
-fn overflown_octals() {
-    // GNU tr detects potentially overflowing octals and cuts them off at 2 digits
-    assert_eq!(parse("\\525".to_string()), "*5".to_string());
 }
