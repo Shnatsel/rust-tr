@@ -77,15 +77,7 @@ pub fn parse(input_string: String) -> String {
                 if is_octal_digit {escaped_octal_digits.push(character)};
                 // check if we should stop parsing incoming chars as escaped octal digits
                 if !is_octal_digit || (first_digit_too_big_for_long_octal && escaped_octal_digits.len() == 2) || escaped_octal_digits.len() == 3 {
-
-                    //TODO: split this block into a function to avoid copypasting this below
-                    let mut final_char_code = 0u32;
-                    escaped_octal_digits.reverse(); // for use in the loop below
-                    for (order, digit_char) in escaped_octal_digits.iter().enumerate() {
-                        let octal_digit = digit_char.to_digit(8).unwrap();
-                        final_char_code += octal_digit * 8u32.pow(order as u32);
-                    }
-                    output_string.push(std::char::from_u32(final_char_code).unwrap());
+                    output_string.push(octal_digits_to_char(&escaped_octal_digits));
                     escaped_octal_digits.clear();
                     parser_mode = EscapeParserMode::Normal;
                 }
@@ -100,13 +92,23 @@ pub fn parse(input_string: String) -> String {
         previous_character = Option::Some(character);
     };
     // wrap up parsing after the loop
-    //println!("Parser mode at the end: {:?}", parser_mode);
     match parser_mode {
         EscapeParserMode::CharacterRange => output_string.push('-'), // wrap up unclosed ranges
-        EscapeParserMode::Normal => if previous_character.unwrap_or(' ') == '\\' {output_string.push('\\')}, //wrap up parsing a trailing \
-        _ => {}, //TODO: wrap up parsing unclosed octals after the loop
+        EscapeParserMode::Normal => if previous_character.unwrap_or(' ') == '\\' {output_string.push('\\')}, //wrap up parsing a trailing \ 
+        EscapeParserMode::EscapedOctalDigits => {output_string.push(octal_digits_to_char(&escaped_octal_digits))}, // wrap up parsing unclosed octals, e.g. in "abcd\53"
     };
     return output_string;
+}
+
+fn octal_digits_to_char(octal_digits: &Vec<char>) -> char {
+    let mut final_char_code = 0u32;
+    let mut octal_digits = octal_digits.to_owned();
+    octal_digits.reverse(); // for use in the loop below
+    for (order, digit_char) in octal_digits.iter().enumerate() {
+        let octal_digit = digit_char.to_digit(8).unwrap();
+        final_char_code += octal_digit * 8u32.pow(order as u32);
+    }
+    return std::char::from_u32(final_char_code).unwrap()
 }
 
 #[test]
@@ -137,7 +139,7 @@ fn escape_sequences() {
     assert_eq!(parse("a\\123".to_string()), "aS".to_string());
     assert_eq!(parse("\\123".to_string()), "S".to_string());
     assert_eq!(parse("a\\12".to_string()), "a\n".to_string());
-    println!("\\53 translates to: \"{}\"", parse("\\53".to_string()));
+    assert_eq!(parse("\\53".to_string()), "+".to_string());
 }
 
 #[test]
