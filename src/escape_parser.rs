@@ -109,6 +109,16 @@ fn octal_digits_to_char(octal_digits: &Vec<char>) -> char {
     return std::char::from_u32(final_char_code).unwrap()
 }
 
+// Whether the character with the given index is escaped or not
+// "Escaped" means "preceded by a backslash that is not escaped"
+fn is_escaped(index: usize, context: &Vec<char>) -> bool {
+    match index {
+        0 => false,
+        1 => context[0] == '\\',
+        x => context[x-1] == '\\' && !(context[x-2] == '\\')
+    }
+}
+
 
 #[test]
 fn literal_input() {
@@ -146,6 +156,12 @@ fn escape_sequences() {
 fn escaped_escape_sequences() {
     assert_eq!(parse("a\\\\nb".to_string()), "a\\nb".chars().collect::<Vec<char>>());
     assert_eq!(parse("\\\\123".to_string()), "\\\\123".chars().collect::<Vec<char>>());
+}
+
+#[test]
+#[ignore] //known to fail
+fn invalid_escape_sequences() {
+    assert_eq!(parse("\\m".to_string()), "\\m".chars().collect::<Vec<char>>());
 }
 
 #[test]
