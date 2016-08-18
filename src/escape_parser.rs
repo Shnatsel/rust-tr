@@ -143,6 +143,12 @@ fn escape_sequences() {
     assert_eq!(parse("\\53".to_string()), "+".chars().collect::<Vec<char>>());
 }
 
+#[test]
+#[ignore] //known to fail
+fn escaped_escape_sequences() {
+    assert_eq!(parse("a\\\\nb".to_string()), "a\\nb".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\\\123".to_string()), "\\\\123".chars().collect::<Vec<char>>());
+}
 
 #[test]
 fn overflown_octals() {
