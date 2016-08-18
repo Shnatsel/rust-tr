@@ -40,12 +40,12 @@ fn main() {
                      else {first_non_option_argument = arg_number; break},
             }
         }
-        let mut chars_to_replace: Vec<char> = escape_parser::parse(env::args().skip(1).nth(first_non_option_argument).unwrap()).chars().collect();
+        let mut chars_to_replace: Vec<char> = escape_parser::parse(env::args().skip(1).nth(first_non_option_argument).unwrap());
         match operation_mode {
             // if we're replacing, read the chars to replace with from command line
             TrMode::ReplaceWith(_) => {
                 if env::args().skip(1).nth(first_non_option_argument + 1).is_some() {
-                    let chars_to_insert: Vec<char> = escape_parser::parse(env::args().skip(1).nth(first_non_option_argument + 1).unwrap()).chars().collect();
+                    let chars_to_insert: Vec<char> = escape_parser::parse(env::args().skip(1).nth(first_non_option_argument + 1).unwrap());
                     if truncate_set {chars_to_replace.truncate(chars_to_insert.len())};
                     operation_mode = TrMode::ReplaceWith(chars_to_insert);
                 } else if squeeze_repeats {
@@ -65,9 +65,9 @@ fn main() {
 
         // determine which characters to use for squeezing repeats
         let chars_to_squeeze: Vec<char> = if only_squeeze_repeats {
-            escape_parser::parse(env::args().skip(1).nth(first_non_option_argument).unwrap()).chars().collect()
+            escape_parser::parse(env::args().skip(1).nth(first_non_option_argument).unwrap())
         } else if (operation_mode == TrMode::Delete) && squeeze_repeats {
-            escape_parser::parse(env::args().skip(1).nth(first_non_option_argument + 1).unwrap()).chars().collect()
+            escape_parser::parse(env::args().skip(1).nth(first_non_option_argument + 1).unwrap())
         } else {
             Vec::new()
         };
@@ -89,6 +89,9 @@ fn main() {
             };
 
             // separate pass for squeezing repeated characters
+            // FIXME: doesn't squeeze repeated '\n' characters because it's line-buffered.
+            // This should be fixed by reading the input char-by-char,
+            // but that is an unstable feature as of Rust 1.10
             if squeeze_repeats {
                 let mut previous_character = Option::None;
                 for character in if only_squeeze_repeats {buffer.chars()} else {result.chars()} {
