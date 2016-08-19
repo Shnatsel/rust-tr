@@ -74,12 +74,12 @@ fn main() {
 
         // main tr loop
         while stdin.read_line(&mut buffer).unwrap() > 0 {
-            if ! only_squeeze_repeats {
+            if ! only_squeeze_repeats { //TODO: skip this if set2 is empty and -t is given
                 for character in buffer.chars() {
                     if chars_to_replace.contains(&character) ^ complement_set {
                         match operation_mode {
                              //TODO: handle this as set instead of inserting single char
-                            TrMode::ReplaceWith(ref chars_to_insert) => result.push(chars_to_insert[0]),
+                            TrMode::ReplaceWith(ref chars_to_insert) => result.push(translate(character, &chars_to_replace, chars_to_insert)),
                             TrMode::Delete => {}, //do not copy char to output buffer
                         }
                     } else {
@@ -120,4 +120,17 @@ fn main() {
         println!("Usage: tr [OPTION]... SET1 [SET2]");
     }
 }
+
+
+fn translate(character: char, set1: &Vec<char>, set2: &Vec<char>) -> char {
+    match set1.iter().rposition(|&c| c == character) {
+        None => character,
+        Some(index) => match set2.get(index) {
+            Some(char_to_insert) => *char_to_insert,
+            None => set2[set2.len() - 1],
+        }
+    }
+}
+
+
 
