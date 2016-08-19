@@ -1,81 +1,74 @@
 use std;
 
-#[derive(PartialEq)]
-#[derive(Debug)]
-enum EscapeParserMode {
-    Normal,
-    EscapedOctalDigits,
-    //TODO: more modes, or just separate passes?
-}
-
 // Escape parser for command-line arguments SET1 and SET2
 pub fn parse(input_string: String) -> Vec<char> {
-    let mut parser_mode = EscapeParserMode::Normal;
-    let mut previous_character: std::option::Option<char> = Option::None;
+    let input_chars: Vec<char> = input_string.chars().collect();
+    //let mut parser_mode = EscapeParserMode::Normal; //XXX DROP
+    //let mut previous_character: std::option::Option<char> = Option::None; //XXX DROP
     let mut escaped_octal_digits: Vec<char> = Vec::with_capacity(3);
-    let mut unescaped_characters: Vec<char> = Vec::with_capacity(input_string.len()); //TODO: also store character classes in this array, wrapped in enums?
-    let mut final_character_set: Vec<char> = Vec::with_capacity(input_string.len());
-    for character in input_string.chars() {
-        match parser_mode {
-            EscapeParserMode::Normal => {
-                if character == '\\' {
-                    // escapes special character; do nothing and handle the special char next round
-                } else if previous_character.is_some() && previous_character.unwrap() == '\\' {
-                    match character {
-                        '\\' => unescaped_characters.push('\\'),
-                        'n' => unescaped_characters.push('\n'),
-                        'r' => unescaped_characters.push('\r'),
-                        't' => unescaped_characters.push('\t'),
-                        'a' => unescaped_characters.push('\x07'),
-                        'b' => unescaped_characters.push('\x08'),
-                        'f' => unescaped_characters.push('\x0C'),
-                        'v' => unescaped_characters.push('\x0B'),
-                        digit @ '0' ... '7' => {escaped_octal_digits.push(digit);
-                                                parser_mode = EscapeParserMode::EscapedOctalDigits},
-                        _ => panic!("Unknown escape sequence \\{}", character),
-                    }
-                } else {
-                    unescaped_characters.push(character);
+    let mut unescaped_characters: Vec<char> = Vec::with_capacity(input_chars.len()); //TODO: also store character classes in this array, wrapped in enums?
+    let mut final_character_set: Vec<char> = Vec::with_capacity(input_chars.len());
+    let mut index: usize = 0;
+    let mut next_index: usize = 0;
+    while index < input_chars.len() {
+        // On every iteration "index" is unaltered,
+        // so we can address characters by index starting from the one we're handling.
+        // We also need to keep track of the amount of characters that we have processed
+        // (consumed), which is what next_index variable is for.
+        // It is incremented every time we consume an *input* character,
+        // and the next iteration starts from the previous one's next_index.
+        next_index += 1;
+        if input_chars[index] == '\\' {
+            if is_escaped(index, &input_chars) || index == input_chars.len() - 1 {
+                unescaped_characters.push('\\')
+            } else { // this backslash escapes a special character
+                next_index += 1;
+                match input_chars[index+1] {
+                    '\\' => unescaped_characters.push('\\'),
+                    '[' => unescaped_characters.push('['),
+                    'n' => unescaped_characters.push('\n'),
+                    'r' => unescaped_characters.push('\r'),
+                    't' => unescaped_characters.push('\t'),
+                    'a' => unescaped_characters.push('\x07'),
+                    'b' => unescaped_characters.push('\x08'),
+                    'f' => unescaped_characters.push('\x0C'),
+                    'v' => unescaped_characters.push('\x0B'),
+                    digit @ '0' ... '7' => {
+                        escaped_octal_digits.push(digit);
+                        let long_octal_possible = match digit {
+                            '0' ... '3' => true,
+                            '4' ... '9' => false,
+                            _ => panic!("Your changes are bad and you should feel bad."),
+                        };
+                        if input_chars.get(index+2).is_some()
+                        && is_octal_digit(input_chars[index+2]) {
+                            next_index += 1;
+                            escaped_octal_digits.push(input_chars[index+2]);
+                        };
+                        if long_octal_possible
+                        && input_chars.get(index+3).is_some()
+                        && is_octal_digit(input_chars[index+3]) {
+                            next_index += 1;
+                            escaped_octal_digits.push(input_chars[index+3]);
+                        };
+                        unescaped_characters.push(octal_digits_to_char(&escaped_octal_digits));
+                        escaped_octal_digits.clear();
+                    },
+                    nonspecial_char => {
+                        unescaped_characters.push('\\');
+                        unescaped_characters.push(nonspecial_char);
+                    },
                 };
-            },
-            EscapeParserMode::EscapedOctalDigits => {
-                let is_octal_digit = match character {'0' ... '7' => true, _ => false};
-                let first_digit_too_big_for_long_octal = if escaped_octal_digits.len() == 0 {
-                    false
-                } else {
-                    // Octal values of 400 and higher trigger a warning from GNU tr.
-                    // It interprets the first two digits as the character code,
-                    // and the last digit as a standalone digit.
-                    match escaped_octal_digits[0] {
-                        '0' ... '3' => false,
-                        '4' ... '9' => true,
-                        _ => panic!("Internal error: a non-digit was somehow put in octal digits buffer.\nPlease file a bug report."),
-                    }
-                };
-                // process the character we got
-                if is_octal_digit {escaped_octal_digits.push(character)};
-                // check if we should stop parsing incoming chars as escaped octal digits
-                if !is_octal_digit || (first_digit_too_big_for_long_octal && escaped_octal_digits.len() == 2) || escaped_octal_digits.len() == 3 {
-                    unescaped_characters.push(octal_digits_to_char(&escaped_octal_digits));
-                    escaped_octal_digits.clear();
-                    parser_mode = EscapeParserMode::Normal;
-                }
-                // this block is here because if we encounter a regular character,
-                // it should be pushed AFTER we handle the escaped character
-                // example sequence: a\12b
-                if is_octal_digit {} // already handled above
-                else if character == '\\' {} // do nothing, will be handled next round
-                else {unescaped_characters.push(character)};
-            },
-        };
-        previous_character = Option::Some(character);
-    };
-    // wrap up parsing after the loop
-    match parser_mode {
-        EscapeParserMode::Normal => if previous_character.unwrap_or(' ') == '\\' {unescaped_characters.push('\\')}, //wrap up parsing a trailing \ 
-        EscapeParserMode::EscapedOctalDigits => {unescaped_characters.push(octal_digits_to_char(&escaped_octal_digits))}, // wrap up parsing unclosed octals, e.g. in "abcd\53"
-    };
-    // XXX Ranges
+            }
+        } else {
+            unescaped_characters.push(input_chars[index]);
+        }
+        index = next_index;
+    }
+
+    // Parsing of ranges implemented as a separate pass
+    // because they need to operate on already unescaped characters
+    // to handle user input like '\50-\53'
     for (index, unescaped_char) in unescaped_characters.iter().enumerate() {
         if *unescaped_char == '-' && index > 0 && index < (unescaped_characters.len() - 1) {
             let lower_bound = unescaped_characters[index-1] as u32 + 1;
@@ -98,6 +91,10 @@ pub fn parse(input_string: String) -> Vec<char> {
         }
     };
     return final_character_set;
+}
+
+fn is_octal_digit(character: char) -> bool {
+    match character {'0' ... '7' => true, _ => false}
 }
 
 fn octal_digits_to_char(octal_digits: &Vec<char>) -> char {
@@ -152,14 +149,12 @@ fn escape_sequences() {
 }
 
 #[test]
-#[ignore] //known to fail
 fn escaped_escape_sequences() {
     assert_eq!(parse("a\\\\nb".to_string()), "a\\nb".chars().collect::<Vec<char>>());
-    assert_eq!(parse("\\\\123".to_string()), "\\\\123".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\\\123".to_string()), "\\123".chars().collect::<Vec<char>>());
 }
 
 #[test]
-#[ignore] //known to fail
 fn invalid_escape_sequences() {
     assert_eq!(parse("\\m".to_string()), "\\m".chars().collect::<Vec<char>>());
 }
