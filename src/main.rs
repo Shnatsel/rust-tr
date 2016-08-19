@@ -66,19 +66,18 @@ fn main() {
         // determine which characters to use for squeezing repeats
         let chars_to_squeeze: Vec<char> = if only_squeeze_repeats {
             escape_parser::parse(env::args().skip(1).nth(first_non_option_argument).unwrap())
-        } else if (operation_mode == TrMode::Delete) && squeeze_repeats {
+        } else if squeeze_repeats {
             escape_parser::parse(env::args().skip(1).nth(first_non_option_argument + 1).unwrap())
         } else {
             Vec::new()
         };
-
+        
         // main tr loop
         while stdin.read_line(&mut buffer).unwrap() > 0 {
             if ! only_squeeze_repeats { //TODO: skip this if set2 is empty and -t is given
                 for character in buffer.chars() {
                     if chars_to_replace.contains(&character) ^ complement_set {
                         match operation_mode {
-                             //TODO: handle this as set instead of inserting single char
                             TrMode::ReplaceWith(ref chars_to_insert) => result.push(translate(character, &chars_to_replace, chars_to_insert)),
                             TrMode::Delete => {}, //do not copy char to output buffer
                         }
