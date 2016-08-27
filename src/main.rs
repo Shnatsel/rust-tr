@@ -23,6 +23,7 @@ fn main() {
 //    let mut buffer = String::new();
 //    let mut result = String::new();
 //    let mut squeezed_result = String::new();
+    let mut output_buffer = String::with_capacity(200);
     let mut operation_mode = TrMode::ReplaceWith(Vec::new()); //default mode
     let mut squeeze_repeats = false;
     let mut only_squeeze_repeats = false;
@@ -121,12 +122,17 @@ fn main() {
             match processed_character {
                 None => {},
                 Some(out_character) => {
-                    stdout.write_fmt(format_args!("{}", out_character));
+                    output_buffer.push(out_character);
                     //TODO: set previous char to this one
                 },
             }
+            if output_buffer.len() >= 50 {
+                stdout.write(output_buffer.as_str().as_bytes());
+                output_buffer.clear();
+            }
 
         }
+        stdout.write(output_buffer.as_str().as_bytes());
         // output is line-buffered, but we do not always print \n,
         // so without the following line we may never output anything
         stdout.flush().unwrap();
