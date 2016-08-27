@@ -1,4 +1,6 @@
+#![feature(io)] // because .chars() on a reader is not stable as of Rust 1.10
 use std::io;
+use std::io::BufReader;
 use std::env;
 use std::io::prelude::*;
 
@@ -15,9 +17,12 @@ enum TrMode {
 fn main() {
     let stdin = io::stdin();
     let mut stdin = stdin.lock();
-    let mut buffer = String::new();
-    let mut result = String::new();
-    let mut squeezed_result = String::new();
+    let mut buffered_stdin = BufReader::new(stdin);
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+//    let mut buffer = String::new();
+//    let mut result = String::new();
+//    let mut squeezed_result = String::new();
     let mut operation_mode = TrMode::ReplaceWith(Vec::new()); //default mode
     let mut squeeze_repeats = false;
     let mut only_squeeze_repeats = false;
@@ -73,24 +78,26 @@ fn main() {
         };
         
         // main tr loop
-        while stdin.read_line(&mut buffer).unwrap() > 0 {
+        for character in buffered_stdin.chars() {
+            let character = character.unwrap(); // TODO: error handling
+            let mut processed_character = Option::None;
+
             if ! only_squeeze_repeats { //TODO: skip this if set2 is empty and -t is given
-                for character in buffer.chars() {
-                    if chars_to_replace.contains(&character) ^ complement_set {
-                        match operation_mode {
-                            TrMode::ReplaceWith(ref chars_to_insert) => result.push(translate(character, &chars_to_replace, chars_to_insert)),
-                            TrMode::Delete => {}, //do not copy char to output buffer
-                        }
-                    } else {
-                        result.push(character)
-                    };
+                if chars_to_replace.contains(&character) ^ complement_set {
+                    match operation_mode {
+                        TrMode::ReplaceWith(ref chars_to_insert) => processed_character = Option::Some(translate(character, &chars_to_replace, chars_to_insert)),
+                        TrMode::Delete => processed_character = Option::None,
+                    }
+                } else {
+                    processed_character = Option::Some(character)
                 };
             };
 
             // separate pass for squeezing repeated characters
-            // FIXME: doesn't squeeze repeated '\n' characters because it's line-buffered.
+            // FIXME: doesn't squeeze repeated '\n' characters because it's line-based.
             // This should be fixed by reading the input char-by-char,
             // but that is an unstable feature as of Rust 1.10
+/*
             if squeeze_repeats {
                 let mut previous_character = Option::None;
                 for character in if only_squeeze_repeats {buffer.chars()} else {result.chars()} {
@@ -107,13 +114,22 @@ fn main() {
             } else {
                 print!("{}", result);
             }
-            // output is line-buffered, but we do not always print \n,
-            // so without the following line we may never output anything
-            io::stdout().flush().unwrap();
             buffer.clear();
             result.clear();
             squeezed_result.clear();
+*/
+            match processed_character {
+                None => {},
+                Some(out_character) => {
+                    stdout.write_fmt(format_args!("{}", out_character));
+                    //TODO: set previous char to this one
+                },
+            }
+
         }
+        // output is line-buffered, but we do not always print \n,
+        // so without the following line we may never output anything
+        stdout.flush().unwrap();
 
     } else {
         println!("Usage: tr [OPTION]... SET1 [SET2]");
@@ -130,6 +146,4 @@ fn translate(character: char, set1: &Vec<char>, set2: &Vec<char>) -> char {
         }
     }
 }
-
-
 
