@@ -1,7 +1,7 @@
 use std;
 
 // Escape parser for command-line arguments SET1 and SET2
-pub fn parse(input_string: String) -> Vec<char> {
+pub fn parse(input_string: &str) -> Vec<char> {
     let input_chars: Vec<char> = input_string.chars().collect();
     //let mut parser_mode = EscapeParserMode::Normal; //XXX DROP
     //let mut previous_character: std::option::Option<char> = Option::None; //XXX DROP
@@ -97,7 +97,7 @@ fn is_octal_digit(character: char) -> bool {
     match character {'0' ... '7' => true, _ => false}
 }
 
-fn octal_digits_to_char(octal_digits: &Vec<char>) -> char {
+fn octal_digits_to_char(octal_digits: &[char]) -> char {
     let mut final_char_code = 0u32;
     for (order, digit_char) in octal_digits.iter().rev().enumerate() {
         let octal_digit = digit_char.to_digit(8).unwrap();
@@ -108,7 +108,7 @@ fn octal_digits_to_char(octal_digits: &Vec<char>) -> char {
 
 // Whether the character with the given index is escaped or not
 // "Escaped" means "preceded by a backslash that is not escaped"
-fn is_escaped(index: usize, context: &Vec<char>) -> bool {
+fn is_escaped(index: usize, context: &[char]) -> bool {
     match index {
         0 => false,
         1 => context[0] == '\\',
@@ -119,63 +119,63 @@ fn is_escaped(index: usize, context: &Vec<char>) -> bool {
 
 #[test]
 fn literal_input() {
-    assert_eq!(parse("abcd".to_string()), "abcd".chars().collect::<Vec<char>>());
-    assert_eq!(parse("абвг".to_string()), "абвг".chars().collect::<Vec<char>>());
+    assert_eq!(parse("abcd"), "abcd".chars().collect::<Vec<char>>());
+    assert_eq!(parse("абвг"), "абвг".chars().collect::<Vec<char>>());
 }
 
 #[test]
 fn character_ranges() {
-    assert_eq!(parse("ab-d".to_string()), "abcd".chars().collect::<Vec<char>>());
-    assert_eq!(parse("a-def".to_string()), "abcdef".chars().collect::<Vec<char>>());
-    assert_eq!(parse("a-a".to_string()), "a".chars().collect::<Vec<char>>());
-    assert_eq!(parse("a-".to_string()), "a-".chars().collect::<Vec<char>>());
-    assert_eq!(parse("-a".to_string()), "-a".chars().collect::<Vec<char>>());
+    assert_eq!(parse("ab-d"), "abcd".chars().collect::<Vec<char>>());
+    assert_eq!(parse("a-def"), "abcdef".chars().collect::<Vec<char>>());
+    assert_eq!(parse("a-a"), "a".chars().collect::<Vec<char>>());
+    assert_eq!(parse("a-"), "a-".chars().collect::<Vec<char>>());
+    assert_eq!(parse("-a"), "-a".chars().collect::<Vec<char>>());
 }
 
 #[test]
 #[should_panic(expected = "tr: range-endpoints of 'd-a' are in reverse collating sequence order")]
 fn invalid_character_range() {
-    parse("d-a".to_string());
+    parse("d-a");
 }
 
 #[test]
 fn escape_sequences() {
-    assert_eq!(parse("a\\nb".to_string()), "a\nb".chars().collect::<Vec<char>>());
-    assert_eq!(parse("a\\12b".to_string()), "a\nb".chars().collect::<Vec<char>>());
-    assert_eq!(parse("a\\123".to_string()), "aS".chars().collect::<Vec<char>>());
-    assert_eq!(parse("\\123".to_string()), "S".chars().collect::<Vec<char>>());
-    assert_eq!(parse("a\\12".to_string()), "a\n".chars().collect::<Vec<char>>());
-    assert_eq!(parse("\\53".to_string()), "+".chars().collect::<Vec<char>>());
+    assert_eq!(parse("a\\nb"), "a\nb".chars().collect::<Vec<char>>());
+    assert_eq!(parse("a\\12b"), "a\nb".chars().collect::<Vec<char>>());
+    assert_eq!(parse("a\\123"), "aS".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\123"), "S".chars().collect::<Vec<char>>());
+    assert_eq!(parse("a\\12"), "a\n".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\53"), "+".chars().collect::<Vec<char>>());
 }
 
 #[test]
 fn escaped_escape_sequences() {
-    assert_eq!(parse("a\\\\nb".to_string()), "a\\nb".chars().collect::<Vec<char>>());
-    assert_eq!(parse("\\\\123".to_string()), "\\123".chars().collect::<Vec<char>>());
+    assert_eq!(parse("a\\\\nb"), "a\\nb".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\\\123"), "\\123".chars().collect::<Vec<char>>());
 }
 
 #[test]
 fn invalid_escape_sequences() {
-    assert_eq!(parse("\\m".to_string()), "\\m".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\m"), "\\m".chars().collect::<Vec<char>>());
 }
 
 #[test]
 fn overflown_octals() {
     // GNU tr detects potentially overflowing octals and cuts them off at 2 digits
-    assert_eq!(parse("\\525".to_string()), "*5".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\525"), "*5".chars().collect::<Vec<char>>());
 }
 
 #[test]
 fn trailing_slashes() {
-    assert_eq!(parse("\\\\".to_string()), "\\".chars().collect::<Vec<char>>());
-    assert_eq!(parse("\\".to_string()), "\\".chars().collect::<Vec<char>>());
-    assert_eq!(parse("a\\".to_string()), "a\\".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\\\"), "\\".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\"), "\\".chars().collect::<Vec<char>>());
+    assert_eq!(parse("a\\"), "a\\".chars().collect::<Vec<char>>());
 }
 
 #[test]
 fn ranges_on_escape_sequences() {
-    assert_eq!(parse("\\120-\\123".to_string()), "PQRS".chars().collect::<Vec<char>>());
-    assert_eq!(parse("\\50-\\57".to_string()), "()*+,-./".chars().collect::<Vec<char>>());
-    assert_eq!(parse("\\53-\\53".to_string()), "+".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\120-\\123"), "PQRS".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\50-\\57"), "()*+,-./".chars().collect::<Vec<char>>());
+    assert_eq!(parse("\\53-\\53"), "+".chars().collect::<Vec<char>>());
 }
 
