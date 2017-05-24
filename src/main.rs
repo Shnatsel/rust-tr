@@ -40,12 +40,12 @@ fn main() {
                      else {first_non_option_argument = arg_number; break},
             }
         }
-        let mut chars_to_replace: Vec<char> = escape_parser::parse(env::args().skip(1).nth(first_non_option_argument).unwrap());
+        let mut chars_to_replace: Vec<char> = escape_parser::parse(&env::args().skip(1).nth(first_non_option_argument).unwrap());
         match operation_mode {
             // if we're replacing, read the chars to replace with from command line
             TrMode::ReplaceWith(_) => {
                 if env::args().skip(1).nth(first_non_option_argument + 1).is_some() {
-                    let chars_to_insert: Vec<char> = escape_parser::parse(env::args().skip(1).nth(first_non_option_argument + 1).unwrap());
+                    let chars_to_insert: Vec<char> = escape_parser::parse(&env::args().skip(1).nth(first_non_option_argument + 1).unwrap());
                     if truncate_set {chars_to_replace.truncate(chars_to_insert.len())};
                     operation_mode = TrMode::ReplaceWith(chars_to_insert);
                 } else if squeeze_repeats {
@@ -65,9 +65,9 @@ fn main() {
 
         // determine which characters to use for squeezing repeats
         let chars_to_squeeze: Vec<char> = if only_squeeze_repeats {
-            escape_parser::parse(env::args().skip(1).nth(first_non_option_argument).unwrap())
+            escape_parser::parse(&env::args().skip(1).nth(first_non_option_argument).unwrap())
         } else if squeeze_repeats {
-            escape_parser::parse(env::args().skip(1).nth(first_non_option_argument + 1).unwrap())
+            escape_parser::parse(&env::args().skip(1).nth(first_non_option_argument + 1).unwrap())
         } else {
             Vec::new()
         };
@@ -121,7 +121,7 @@ fn main() {
 }
 
 
-fn translate(character: char, set1: &Vec<char>, set2: &Vec<char>) -> char {
+fn translate(character: char, set1: &[char], set2: &[char]) -> char {
     match set1.iter().rposition(|&c| c == character) {
         None => character,
         Some(index) => match set2.get(index) {
